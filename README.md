@@ -45,8 +45,8 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 もしバッファの言語モードが、cmt-region.lに登録されてないものだった場合は、コメントの文字を聞いてきますので、入力してください。
 
 蛇足かもしれませんが、こんな感じ↓で  
-`(global-set-key '(#\C-c #\c) 'commentout-region)`  
-`(global-set-key '(#\C-c #\u) 'uncomment-region)`  
+    (global-set-key '(#\C-c #\c) 'commentout-region)
+    (global-set-key '(#\C-c #\u) 'uncomment-region)  
 適当なキーバインドを割り当てた方が実用的かと思います（デフォルトでは割り当てられません）。  
 
 できるだけ、先頭行のコメント開始位置のインデントの深さを維持するようにがんばりますが、コメント開始位置よりもインデントが浅い行はコメント位置も浅くなります。また、インデントにタブ文字が使用されている場合は上手くきません。
@@ -58,29 +58,29 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 ###4.設定
 xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してください。  
 
-* デフォルトにない言語モードを追加する  
+・デフォルトにない言語モードを追加する  
 例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。  
-`(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))`  
-`(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))`  
+    (setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
+    (setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))  
 コメント文字はハッシュテーブル "*-commentize-mode-table-*" にハッシュで格納されます。
 モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。
 行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
 
-* コメント文字とコメントする文字列の間にスペースを入れるか否か（デフォルト: t）  
+・コメント文字とコメントする文字列の間にスペースを入れるか否か（デフォルト: t）  
 `(setq *-let-inside-space-* t)`  
-* コメント文字とコメント外文字列の間にスペースを入れるか否か（デフォルト: t）  
+・コメント文字とコメント外文字列の間にスペースを入れるか否か（デフォルト: t）  
 `(setq *-let-outside-space-* t)`  
 
 `t`（スペースを入れる）か`nil`（入れない）を選択してください。
 
-* コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
+・コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
 `(setq *-inside-space-width-* 1)`  
-* コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
+・コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
 `(setq *-outside-space-width-* 2)`  
 
 スペース数を数値で指定してください。  
 
-*-inside-space-width-*と*-outside-sapce-width-*を0にした場合、*-let-inside-space-*と*-let-inside-space-*をそれぞれnilにしたのと（結果的に）同じ挙動となります。
+asterisk-inside-space-width-asteriskとasterisk-outside-sapce-width-asteriskを0にした場合、asterisk-let-inside-space-asteriskとasterisk-let-inside-space-asteriskをそれぞれnilにしたのと（結果的に）同じ挙動となります。
 
 * * *
 

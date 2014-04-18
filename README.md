@@ -72,24 +72,24 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してく�
     行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
 
 * これらは`t`（空白文字を入れる）か`nil`（入れない）を選択してください。
-* コメント文字とコメントする文字列の間に空白文字を入れるか否か（デフォルト: t）  
-    ```lisp
-    (setq *-let-inside-space-* t)
-    ```
-* コメント文字とコメント外文字列の間に空白文字を入れるか否か（デフォルト: t）  
-    ```lisp
-    (setq *-let-outside-space-* t)
-    ```
+    * コメント文字とコメントする文字列の間に空白文字を入れるか否か（デフォルト: t）  
+        ```lisp
+        (setq *-let-inside-space-* t)
+        ```
+    * コメント文字とコメント外文字列の間に空白文字を入れるか否か（デフォルト: t）  
+        ```lisp
+        (setq *-let-outside-space-* t)
+        ```
 
 * これらはスペース数を数値で指定してください。  
-* コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
-    ```lisp
-    (setq *-inside-space-width-* 1)
-    ```
-* コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
-    ```lisp
-    (setq *-outside-space-width-* 2)
-    ```
+    * コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
+        ```lisp
+        (setq *-inside-space-width-* 1)
+        ```
+    * コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
+        ```lisp
+        (setq *-outside-space-width-* 2)
+        ```
 
 \*-inside-space-width-\*と\*-outside-space-width-\*を0にした場合、\*-let-inside-space-\*と\*-let-inside-space-\*をそれぞれnilにしたのと（結果的に）同じ挙動となります。
 

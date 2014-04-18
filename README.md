@@ -66,21 +66,21 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してく�
 モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。
 行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
 
-・コメント文字とコメントする文字列の間にスペースを入れるか否か（デフォルト: t）  
+* コメント文字とコメントする文字列の間にスペースを入れるか否か（デフォルト: t）  
 `(setq *-let-inside-space-* t)`  
-・コメント文字とコメント外文字列の間にスペースを入れるか否か（デフォルト: t）  
+* コメント文字とコメント外文字列の間にスペースを入れるか否か（デフォルト: t）  
 `(setq *-let-outside-space-* t)`  
 
-`t`（スペースを入れる）か`nil`（入れない）を選択してください。
+    `t`（スペースを入れる）か`nil`（入れない）を選択してください。
 
-・コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
+* コメント文字とコメントする文字列の間に入れるスペースの数（デフォルト: 1）  
 `(setq *-inside-space-width-* 1)`  
-・コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
+* コメント文字とコメント外文字列の間に入れるスペースの数（デフォルト: 2）  
 `(setq *-outside-space-width-* 2)`  
 
-スペース数を数値で指定してください。  
+    スペース数を数値で指定してください。  
 
-asterisk-inside-space-width-asteriskとasterisk-outside-sapce-width-asteriskを0にした場合、asterisk-let-inside-space-asteriskとasterisk-let-inside-space-asteriskをそれぞれnilにしたのと（結果的に）同じ挙動となります。
+\*-inside-space-width-\*と\*-outside-sapce-width-\*を0にした場合、\*-let-inside-space-\*と\*-let-inside-space-\*をそれぞれnilにしたのと（結果的に）同じ挙動となります。
 
 * * *
 

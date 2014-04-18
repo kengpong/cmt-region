@@ -28,8 +28,9 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l）に設定を書く
 Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟдﾟ｀)  
 ということで、cmt-region.lを、xyzzy/site-lisp/下、もしくはロードパス下に置いてください。  
 そして設定ファイル（.xyzzy もしくは siteinit.l）に、以下を追記してください。  
-
-`(load-library "cmt-region.l")`
+```lisp
+(load-library "cmt-region.l")
+```
 
 いうまでもありませんが追記したら再ダンプ（siteinit.lの場合はバイトコンパイルも）が必要です。
 
@@ -66,9 +67,9 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してく�
 (setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
 (setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))
 ```
-コメント文字はハッシュテーブル \*-commentize-mode-table-\* にハッシュで格納されます。
-モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。  
-行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
+    コメント文字はハッシュテーブル \*-commentize-mode-table-\* にハッシュで格納されます。
+    モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。  
+    行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
 
 * コメント文字とコメントする文字列の間に空白文字を入れるか否か（デフォルト: t）  
 ```lisp

@@ -55,7 +55,7 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 ###4.設定
 xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に
 * デフォルトにない言語モードを追加する  
-(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
+`(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))`
 
 * コメント文字とコメントする文字列の間にスペースを入れるか否か（デフォルト: t） 
 `(defvar *-let-inside-space-* t)`
@@ -72,20 +72,20 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に
 * * *
 
 ###5.対応言語モード
-・lisp-interaction-mode : ``  
-・lisp-mode : ``  
-・c-mode : ``  
-・css-mode : ``  
-・py-mode : ``  
-・python-mode : ``  
-・bash-mode : ``  
-・c++-mode : ``  
-・java-mode : ``  
-・javascript-mode : ``  
-・basic-mode : ``  
-・sql-mode : ``  
-・html-mode : ``  
-・pascal-mode : ``  
+・lisp-interaction-mode : `;`  
+・lisp-mode : `;`  
+・c-mode : `/*` `*/`  
+・css-mode : `/*` `*/`  
+・py-mode : `#`  
+・python-mode : `#`  
+・bash-mode : `#`  
+・c++-mode : `//`  
+・java-mode : `//`  
+・javascript-mode : `//`  
+・basic-mode : `'`  
+・sql-mode : `--`  
+・html-mode : `<!--` `-->`  
+・pascal-mode : `{` `}`  
 
 ただし、C言語系のコメントは`/*`と`*/`、`//`、`#if 0`と`#endif`といったものがあります。今後複数種類を切り替えられるように改良したいと思ってます。
 

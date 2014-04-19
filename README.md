@@ -64,7 +64,7 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 お好みでxyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してください。  
 
 * デフォルトにない言語モードを追加する  
-例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。  
+例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。
 ```lisp
 (setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
 (setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))
@@ -74,7 +74,7 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  
 
 * コメント文字とコメントする文字列の間に空白文字を入れるか否か  
-`t`（空白文字を入れる）か`nil`（入れない）を選択してください。（デフォルト: t）  
+`t`（空白文字を入れる）か`nil`（入れない）を選択してください。（デフォルト: t）
 ```lisp
 (setq *-let-inside-space-* t)
 ```

@@ -65,8 +65,8 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 お好みでxyzzyの設定ファイル（.xyzzy もしくは siteinit.l)に追記してください。  
 
 * デフォルトにない言語モードを追加する  
-例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。  
-```lisp(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
+例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。  ```lisp
+(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
 (setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))```
 コメント文字はハッシュテーブル \*-commentize-mode-table-\* にハッシュで格納されます。
 モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。  

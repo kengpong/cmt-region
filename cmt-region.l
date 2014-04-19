@@ -1,0 +1,322 @@
+; cmt-region.l
+;
+; Copyright (c) 2014 Kentarou Hirano (a.k.a Kengpong)
+;
+; This software is released under the MIT License.
+;
+; http://opensource.org/licenses/mit-license.php
+
+; リージョンをコメントアウト／アンコメントする
+
+
+; コメントマークの内側/外側にスペースを入れるならt、入れないならnilを設定する
+(defvar *-let-inside-space-* t)
+(defvar *-let-outside-space-* t)
+
+; コメントマークの内側/外側に入れるスペースの数
+(defvar *-inside-space-width-* 1)
+(defvar *-outside-space-width-* 2)
+
+; 各言語モードに合わせたコメントマーク（文字列）のテーブル
+(defvar *-commentize-mode-table-* (make-hash-table :test #'equalp))
+
+(setf (gethash 'lisp-interaction-mode *-commentize-mode-table-*) '(";" nil))
+(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))
+(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
+(setf (gethash 'css-mode *-commentize-mode-table-*) '("/*" "*/"))
+(setf (gethash 'py-mode *-commentize-mode-table-*) '("#" nil))
+(setf (gethash 'python-mode *-commentize-mode-table-*) '("#" nil))
+(setf (gethash 'bash-mode *-commentize-mode-table-*) '("#" nil))
+(setf (gethash 'c++-mode *-commentize-mode-table-*) '("//" nil))
+(setf (gethash 'java-mode *-commentize-mode-table-*) '("//" nil))
+(setf (gethash 'javascript-mode *-commentize-mode-table-*) '("//" nil))
+(setf (gethash 'basic-mode *-commentize-mode-table-*) '("'" nil))
+(setf (gethash 'sql-mode *-commentize-mode-table-*) '("--" nil))
+(setf (gethash 'html-mode *-commentize-mode-table-*) '("<!--" "-->"))
+(setf (gethash 'pascal-mode *-commentize-mode-table-*) '("{" "}"))
+
+(let ((start-is-not-bol)
+      (start-is-tail-of-indent)
+      (start-is-midpoint-of-indent)
+      (end-is-not-eol)
+      (cmtoutpoint)
+      (top-line-number)
+      (last-line-number))
+
+  ; リージョン内の状況を把握する
+  (defun -get-region-info- (start end)
+    ; リージョン先頭
+    (goto-char start)
+    (setq start-is-not-bol (not (bolp)))
+    (setq start-is-tail-of-indent (-is-indent-tail- start))
+    (setq start-is-midpoint-of-indent (-is-midpoint-of-indent- start))
+
+    ; リージョン末尾
+    (goto-char end)
+    (setq end-is-not-eol (not (eolp))))
+
+
+  ; 現在行のインデントの深さを求める。空行もしくは空白文字だけの行ならnilを返す。
+  (defun -get-indent-width- ()
+    ; 現在行が空行ならtを返す
+    (defun -is-all-blank- ()
+      (cond ((eolp) t)
+          ((looking-at "[^ \t]") nil)
+          (t (forward-char) (-is-all-blank-))))
+
+      (goto-bol)
+      (unless (-is-all-blank-) (current-column)))
+
+
+  ; リージョンの最終行ならt、そうでなければnilを返す
+  (defun -is-lastline- ()
+    (equal (current-line-number) last-line-number))
+
+
+  ; リージョンの開始行ならt、そうでなければnilを返す
+  (defun -is-topline- ()
+    (equal (current-line-number) top-line-number))
+
+
+  ; pntがインデントの末尾（行頭から連なる空白と文字の境界、もしくは行頭に空白
+  ; が無い）かを判断する。インデントの末尾ならt、そうでなければnilを返す
+  (defun -is-indent-tail- (pnt)
+    (save-excursion
+      (goto-bol)
+      (when (string-match "^[ \t]*$" (buffer-substring (point) pnt))
+        t)))
+
+
+  ; pntがインデントの中であればt、そうでなければnilを返す
+  ; pnt位置の行が空行であればnilを返す
+  (defun -is-midpoint-of-indent- (pnt)
+    (save-excursion
+      (goto-char pnt)
+      (loop
+        (unless (looking-at "[ \t]+[^ \t]")
+          (return nil))
+        (backward-char)
+        (when (bolp) (return t)))))
+
+
+  ; モードに合ったコメントアウト文字列の取得
+  (defun -get-cmt-letters- ()
+    (let ((cmt-letters (gethash buffer-mode *-commentize-mode-table-*)))
+      ; commentize-mode-tableに無いモードの場合は
+      ; プロンプトでコメントアウト文字を入力させる
+      ; default: nil
+      (unless cmt-letters
+        (let ((prompt1 "Letter(s) for comment start: ")
+              (prompt2 "Letter(s) for comment end (default: nil): "))
+          (setq cmt-letters
+                (nconc (list (read-string prompt1))
+                       (list (read-string prompt2))))))
+      cmt-letters))
+
+
+  ; コメントアウト文字列の内側/外側のスペース文字列/正規表現を準備する
+  (defun -get-spaces- (&optional (regexp nil))
+    (let ((spclist nil))
+      (dolist (spc-conds
+               (list (list *-let-inside-space-* *-inside-space-width-*)
+                     (list *-let-outside-space-* *-outside-space-width-*))
+               spclist)
+        (setq spclist
+              (append spclist
+                      (if (first spc-conds)
+                          (list
+                           (if regexp
+                              (format nil "[ ]\\{~A\\}" (second spc-conds))
+                             (make-sequence 'string (second spc-conds)
+                                            :initial-element '#\ )))
+                        (list "")))))))
+
+
+  ; コメントアウト文字列を置く位置を決める
+  (defun -get-cmtoutpoint- ()
+    (let ((indent-width)
+          (indent-width-list))
+        (goto-char (point-min))
+        (setq top-line-number (current-line-number))
+        (loop
+          (setq indent-width-list
+                (if (setq indent-width (-get-indent-width-))
+                    (cons indent-width indent-width-list)
+                  indent-width-list))
+          (unless (forward-line) (return)))
+        (setq last-line-number (current-line-number))
+        (setq cmtoutpoint (reduce #'min indent-width-list))))
+
+
+  ; 各行にコメントアウト文字列を置く
+  (defun -put-cmtoutletters- (cmt-letters spaces)
+    ; コメント先頭の処理
+    (when (first cmt-letters)
+      (if (and (-is-topline-)
+               start-is-not-bol)
+            (loop
+              (if (looking-at "[^ \t]")
+                  (return)
+                (forward-char)));)
+        (goto-column cmtoutpoint))
+      (unless (or (eolp) (looking-at "[ \t]*$"))
+        (insert
+         (concat
+          (when (and start-is-not-bol
+                     (-is-topline-)
+                     (not start-is-tail-of-indent))
+            (second spaces))
+          (first cmt-letters) (first spaces)))))
+
+    ; コメント末尾の処理
+    (when (second cmt-letters)
+      (goto-eol)
+      (when (and (-is-lastline-) end-is-not-eol)
+        (backward-char)
+        (loop
+          (if (looking-at "[^ \t]")
+              (progn
+                (forward-char)
+                (return))
+            (backward-char))))
+      (unless (or (bolp) (looking-at "^[ \t]*$"))
+        (insert
+         (concat (first spaces)
+                 (second cmt-letters)
+                 (when (and end-is-not-eol (-is-lastline-))
+                   (second spaces))))))
+    (when (forward-line) (-put-cmtoutletters- cmt-letters spaces)))
+
+
+  ; リージョン内をコメントアウトする
+  (defun commentout-region ()
+    (interactive)
+    (let ((start (min (mark) (point)))
+          (end (max (mark) (point)))
+          (cmt-letters (-get-cmt-letters-))
+          (spaces (-get-spaces-)))
+
+      (save-excursion
+        (-get-region-info- start end)
+        (save-restriction
+          ; リージョン内に編集範囲を限定
+          (if (and start-is-not-bol start-is-midpoint-of-indent)
+              (progn
+                (goto-char start)
+                (goto-bol)
+                (narrow-to-region (point) end))
+            (narrow-to-region start end))
+
+          (-get-cmtoutpoint-)
+          (goto-char (point-min))
+          (-put-cmtoutletters- cmt-letters spaces)))))
+
+
+  ; コメントアウト文字列が存在するかを判定する
+  ; コメントアウト文字列があれば範囲を示したポイント二つが入ったリストを返す。
+  ; 無ければnil
+  (defun -get-scan-range- (c-mark is-open)
+    (if is-open (goto-eol) (goto-bol))
+    (when (scan-buffer c-mark :reverse is-open :tail (not is-open))
+      (list (point) (if is-open (progn (goto-bol) (point))
+                      (progn (goto-eol) (point))))))
+
+
+  ; 最も左側（囲むスタイルのコメントは最も外側）のコメントアウト文字列を特定する
+  (defun -scan-outermost-cmtoutmark- (stmks uc-range)
+    (let* ((c-mark (first stmks))
+           (is-open (fourth stmks))
+           (scan-range (-get-scan-range- c-mark is-open))
+           (cnt-result (-scan-cmtoutmark- c-mark is-open)))
+      (case (first cnt-result)
+        (0 nil)
+        (1 (append uc-range (list (second cnt-result))))
+        (t (narrow-to-region (first scan-range) (second scan-range))
+           (-scan-outermost-cmtoutmark- stmks scan-range)))))
+
+
+  ; コメントアウト文字列を探す
+  (defun -scan-cmtoutmark- (c-mark is-open)
+    (let ((goto-scan-start-point (if is-open #'goto-eol #'goto-bol))
+          (go-next (if is-open #'backward-char #'forward-char))
+          (stop-p (if is-open #'bolp #'eolp))
+          (cnt 0)
+          (pnt))
+      (funcall goto-scan-start-point)
+      (loop
+        (when (looking-for c-mark)
+          (setq cnt (1+ cnt))
+          (setq pnt (point)))
+        (unless (funcall go-next) (return)))
+      (list cnt pnt)))
+
+
+  ; コメントアウト文字列の位置が行末かを判定する（行末ならt、さもなくばnilを返す）
+  (defun -is-line-end- (c-mark pnt)
+    (goto-char pnt)
+    (looking-at (format nil "~A$" c-mark)))
+
+
+  ; コメントアウト文字列を削除する
+  (defun -delete-cmtoutmark- (stmks uncmt-info)
+    (let* ((uncmt-pnt (third uncmt-info))
+           (c-mark (regexp-quote (first stmks)))
+           (l-spc (if (-is-indent-tail- uncmt-pnt)
+                      nil (third stmks)))
+           (r-spc (if (-is-line-end- c-mark uncmt-pnt)
+                      nil (second stmks)))
+           (is-open (fourth stmks))
+           (cmt-regexp
+            (concat l-spc (format nil "\\(~A\\)" c-mark) r-spc)))
+      (save-restriction
+        (narrow-to-region (first uncmt-info) (second uncmt-info))
+        (dolist (dels (list (list cmt-regexp "\\1") (list c-mark "")))
+          (goto-bol)
+          (replace-buffer (first dels) (second dels) :regexp t)))
+        ))
+
+
+  ; アンコメント（コメントアウトから復帰）する
+  (defun uncomment-region ()
+    (interactive)
+    (let* ((start (min (mark) (point)))
+           (end (max (mark) (point)))
+           (cmt-letters (-get-cmt-letters-))
+           (spc-regexps (-get-spaces- t))
+           (is-open (list t nil))
+           (uncmt-info)
+           (line-range)
+           (set-of-marks (mapcar #'list
+                                 cmt-letters
+                                 spc-regexps
+                                 (reverse spc-regexps)
+                                 is-open)))
+
+      (save-excursion
+        (-get-region-info- start end)
+        (save-restriction
+          ; リージョン内に編集範囲を限定
+          (if (and start-is-not-bol (not start-is-midpoint-of-indent))
+              (progn
+                (goto-char start)
+                (goto-bol)
+                (narrow-to-region (point) end))
+            (narrow-to-region start end))
+          (goto-char (point-min))
+
+          (loop
+            (save-restriction
+              ; 編集範囲制限を一行毎に
+              (setq line-range (list (progn (goto-bol) (point))
+                                     (progn (goto-eol) (point))))
+              (narrow-to-region (first line-range) (second line-range))
+              (dolist (stmk set-of-marks)
+                (when (first stmk)
+                  (save-restriction
+                    (setq uncmt-info
+                          (-scan-outermost-cmtoutmark- stmk line-range))
+                    (when uncmt-info
+                      (-delete-cmtoutmark- stmk uncmt-info))))))
+            (unless (next-line) (return))))
+        )))
+  )

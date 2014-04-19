@@ -4,6 +4,7 @@ cmt-region
 xyzzy用lispです。  
 リージョンをコメントアウト／アンコメントします。  
 MITライセンスです。  
+http://opensource.org/licenses/mit-license.php
 
 ###目次
 1. 概要

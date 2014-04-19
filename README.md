@@ -66,10 +66,8 @@ Netinstallerとか、そげんハイカラなものオラ知らね。...( ´ﾟ�
 
 * デフォルトにない言語モードを追加する  
 例えば、c-modeとlisp-modeの設定はこんな感じです（デフォルトで入ってます）。  
-```lisp
-(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
-(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))
-```
+```lisp(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
+(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))```
 コメント文字はハッシュテーブル \*-commentize-mode-table-\* にハッシュで格納されます。
 モード名はクオートして記入し、同じくクオートしたコメント文字のペアをsetfでがっちゃんこします。  
 行末や、（聞いたこと無いけど）行頭に入れるコメント文字が必要無い場合はnilとしてください。  

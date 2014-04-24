@@ -1,322 +1,1 @@
-; cmt-region.l
-;
-; Copyright (c) 2014 Kentarou Hirano (a.k.a Kengpong)
-;
-; This software is released under the MIT License.
-;
-; http://opensource.org/licenses/mit-license.php
-
-; ƒŠ[ƒWƒ‡ƒ“‚ğƒRƒƒ“ƒgƒAƒEƒg^ƒAƒ“ƒRƒƒ“ƒg‚·‚é
-
-
-; ƒRƒƒ“ƒgƒ}[ƒN‚Ì“à‘¤/ŠO‘¤‚ÉƒXƒy[ƒX‚ğ“ü‚ê‚é‚È‚çtA“ü‚ê‚È‚¢‚È‚çnil‚ğİ’è‚·‚é
-(defvar *-let-inside-space-* t)
-(defvar *-let-outside-space-* t)
-
-; ƒRƒƒ“ƒgƒ}[ƒN‚Ì“à‘¤/ŠO‘¤‚É“ü‚ê‚éƒXƒy[ƒX‚Ì”
-(defvar *-inside-space-width-* 1)
-(defvar *-outside-space-width-* 2)
-
-; ŠeŒ¾Œêƒ‚[ƒh‚É‡‚í‚¹‚½ƒRƒƒ“ƒgƒ}[ƒNi•¶š—ñj‚Ìƒe[ƒuƒ‹
-(defvar *-commentize-mode-table-* (make-hash-table :test #'equalp))
-
-(setf (gethash 'lisp-interaction-mode *-commentize-mode-table-*) '(";" nil))
-(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))
-(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))
-(setf (gethash 'css-mode *-commentize-mode-table-*) '("/*" "*/"))
-(setf (gethash 'py-mode *-commentize-mode-table-*) '("#" nil))
-(setf (gethash 'python-mode *-commentize-mode-table-*) '("#" nil))
-(setf (gethash 'bash-mode *-commentize-mode-table-*) '("#" nil))
-(setf (gethash 'c++-mode *-commentize-mode-table-*) '("//" nil))
-(setf (gethash 'java-mode *-commentize-mode-table-*) '("//" nil))
-(setf (gethash 'javascript-mode *-commentize-mode-table-*) '("//" nil))
-(setf (gethash 'basic-mode *-commentize-mode-table-*) '("'" nil))
-(setf (gethash 'sql-mode *-commentize-mode-table-*) '("--" nil))
-(setf (gethash 'html-mode *-commentize-mode-table-*) '("<!--" "-->"))
-(setf (gethash 'pascal-mode *-commentize-mode-table-*) '("{" "}"))
-
-(let ((start-is-not-bol)
-      (start-is-tail-of-indent)
-      (start-is-midpoint-of-indent)
-      (end-is-not-eol)
-      (cmtoutpoint)
-      (top-line-number)
-      (last-line-number))
-
-  ; ƒŠ[ƒWƒ‡ƒ““à‚Ìó‹µ‚ğ”cˆ¬‚·‚é
-  (defun -get-region-info- (start end)
-    ; ƒŠ[ƒWƒ‡ƒ“æ“ª
-    (goto-char start)
-    (setq start-is-not-bol (not (bolp)))
-    (setq start-is-tail-of-indent (-is-indent-tail- start))
-    (setq start-is-midpoint-of-indent (-is-midpoint-of-indent- start))
-
-    ; ƒŠ[ƒWƒ‡ƒ“––”ö
-    (goto-char end)
-    (setq end-is-not-eol (not (eolp))))
-
-
-  ; Œ»İs‚ÌƒCƒ“ƒfƒ“ƒg‚Ì[‚³‚ğ‹‚ß‚éB‹ós‚à‚µ‚­‚Í‹ó”’•¶š‚¾‚¯‚Ìs‚È‚çnil‚ğ•Ô‚·B
-  (defun -get-indent-width- ()
-    ; Œ»İs‚ª‹ós‚È‚çt‚ğ•Ô‚·
-    (defun -is-all-blank- ()
-      (cond ((eolp) t)
-          ((looking-at "[^ \t]") nil)
-          (t (forward-char) (-is-all-blank-))))
-
-      (goto-bol)
-      (unless (-is-all-blank-) (current-column)))
-
-
-  ; ƒŠ[ƒWƒ‡ƒ“‚ÌÅIs‚È‚çtA‚»‚¤‚Å‚È‚¯‚ê‚Înil‚ğ•Ô‚·
-  (defun -is-lastline- ()
-    (equal (current-line-number) last-line-number))
-
-
-  ; ƒŠ[ƒWƒ‡ƒ“‚ÌŠJns‚È‚çtA‚»‚¤‚Å‚È‚¯‚ê‚Înil‚ğ•Ô‚·
-  (defun -is-topline- ()
-    (equal (current-line-number) top-line-number))
-
-
-  ; pnt‚ªƒCƒ“ƒfƒ“ƒg‚Ì––”öis“ª‚©‚ç˜A‚È‚é‹ó”’‚Æ•¶š‚Ì‹«ŠEA‚à‚µ‚­‚Ís“ª‚É‹ó”’
-  ; ‚ª–³‚¢j‚©‚ğ”»’f‚·‚éBƒCƒ“ƒfƒ“ƒg‚Ì––”ö‚È‚çtA‚»‚¤‚Å‚È‚¯‚ê‚Înil‚ğ•Ô‚·
-  (defun -is-indent-tail- (pnt)
-    (save-excursion
-      (goto-bol)
-      (when (string-match "^[ \t]*$" (buffer-substring (point) pnt))
-        t)))
-
-
-  ; pnt‚ªƒCƒ“ƒfƒ“ƒg‚Ì’†‚Å‚ ‚ê‚ÎtA‚»‚¤‚Å‚È‚¯‚ê‚Înil‚ğ•Ô‚·
-  ; pntˆÊ’u‚Ìs‚ª‹ós‚Å‚ ‚ê‚Înil‚ğ•Ô‚·
-  (defun -is-midpoint-of-indent- (pnt)
-    (save-excursion
-      (goto-char pnt)
-      (loop
-        (unless (looking-at "[ \t]+[^ \t]")
-          (return nil))
-        (backward-char)
-        (when (bolp) (return t)))))
-
-
-  ; ƒ‚[ƒh‚É‡‚Á‚½ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚Ìæ“¾
-  (defun -get-cmt-letters- ()
-    (let ((cmt-letters (gethash buffer-mode *-commentize-mode-table-*)))
-      ; commentize-mode-table‚É–³‚¢ƒ‚[ƒh‚Ìê‡‚Í
-      ; ƒvƒƒ“ƒvƒg‚ÅƒRƒƒ“ƒgƒAƒEƒg•¶š‚ğ“ü—Í‚³‚¹‚é
-      ; default: nil
-      (unless cmt-letters
-        (let ((prompt1 "Letter(s) for comment start: ")
-              (prompt2 "Letter(s) for comment end (default: nil): "))
-          (setq cmt-letters
-                (nconc (list (read-string prompt1))
-                       (list (read-string prompt2))))))
-      cmt-letters))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚Ì“à‘¤/ŠO‘¤‚ÌƒXƒy[ƒX•¶š—ñ/³‹K•\Œ»‚ğ€”õ‚·‚é
-  (defun -get-spaces- (&optional (regexp nil))
-    (let ((spclist nil))
-      (dolist (spc-conds
-               (list (list *-let-inside-space-* *-inside-space-width-*)
-                     (list *-let-outside-space-* *-outside-space-width-*))
-               spclist)
-        (setq spclist
-              (append spclist
-                      (if (first spc-conds)
-                          (list
-                           (if regexp
-                              (format nil "[ ]\\{~A\\}" (second spc-conds))
-                             (make-sequence 'string (second spc-conds)
-                                            :initial-element '#\ )))
-                        (list "")))))))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ğ’u‚­ˆÊ’u‚ğŒˆ‚ß‚é
-  (defun -get-cmtoutpoint- ()
-    (let ((indent-width)
-          (indent-width-list))
-        (goto-char (point-min))
-        (setq top-line-number (current-line-number))
-        (loop
-          (setq indent-width-list
-                (if (setq indent-width (-get-indent-width-))
-                    (cons indent-width indent-width-list)
-                  indent-width-list))
-          (unless (forward-line) (return)))
-        (setq last-line-number (current-line-number))
-        (setq cmtoutpoint (reduce #'min indent-width-list))))
-
-
-  ; Šes‚ÉƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ğ’u‚­
-  (defun -put-cmtoutletters- (cmt-letters spaces)
-    ; ƒRƒƒ“ƒgæ“ª‚Ìˆ—
-    (when (first cmt-letters)
-      (if (and (-is-topline-)
-               start-is-not-bol)
-            (loop
-              (if (looking-at "[^ \t]")
-                  (return)
-                (forward-char)));)
-        (goto-column cmtoutpoint))
-      (unless (or (eolp) (looking-at "[ \t]*$"))
-        (insert
-         (concat
-          (when (and start-is-not-bol
-                     (-is-topline-)
-                     (not start-is-tail-of-indent))
-            (second spaces))
-          (first cmt-letters) (first spaces)))))
-
-    ; ƒRƒƒ“ƒg––”ö‚Ìˆ—
-    (when (second cmt-letters)
-      (goto-eol)
-      (when (and (-is-lastline-) end-is-not-eol)
-        (backward-char)
-        (loop
-          (if (looking-at "[^ \t]")
-              (progn
-                (forward-char)
-                (return))
-            (backward-char))))
-      (unless (or (bolp) (looking-at "^[ \t]*$"))
-        (insert
-         (concat (first spaces)
-                 (second cmt-letters)
-                 (when (and end-is-not-eol (-is-lastline-))
-                   (second spaces))))))
-    (when (forward-line) (-put-cmtoutletters- cmt-letters spaces)))
-
-
-  ; ƒŠ[ƒWƒ‡ƒ““à‚ğƒRƒƒ“ƒgƒAƒEƒg‚·‚é
-  (defun commentout-region ()
-    (interactive)
-    (let ((start (min (mark) (point)))
-          (end (max (mark) (point)))
-          (cmt-letters (-get-cmt-letters-))
-          (spaces (-get-spaces-)))
-
-      (save-excursion
-        (-get-region-info- start end)
-        (save-restriction
-          ; ƒŠ[ƒWƒ‡ƒ““à‚É•ÒW”ÍˆÍ‚ğŒÀ’è
-          (if (and start-is-not-bol start-is-midpoint-of-indent)
-              (progn
-                (goto-char start)
-                (goto-bol)
-                (narrow-to-region (point) end))
-            (narrow-to-region start end))
-
-          (-get-cmtoutpoint-)
-          (goto-char (point-min))
-          (-put-cmtoutletters- cmt-letters spaces)))))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ª‘¶İ‚·‚é‚©‚ğ”»’è‚·‚é
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ª‚ ‚ê‚Î”ÍˆÍ‚ğ¦‚µ‚½ƒ|ƒCƒ“ƒg“ñ‚Â‚ª“ü‚Á‚½ƒŠƒXƒg‚ğ•Ô‚·B
-  ; –³‚¯‚ê‚Înil
-  (defun -get-scan-range- (c-mark is-open)
-    (if is-open (goto-eol) (goto-bol))
-    (when (scan-buffer c-mark :reverse is-open :tail (not is-open))
-      (list (point) (if is-open (progn (goto-bol) (point))
-                      (progn (goto-eol) (point))))))
-
-
-  ; Å‚à¶‘¤iˆÍ‚ŞƒXƒ^ƒCƒ‹‚ÌƒRƒƒ“ƒg‚ÍÅ‚àŠO‘¤j‚ÌƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ğ“Á’è‚·‚é
-  (defun -scan-outermost-cmtoutmark- (stmks uc-range)
-    (let* ((c-mark (first stmks))
-           (is-open (fourth stmks))
-           (scan-range (-get-scan-range- c-mark is-open))
-           (cnt-result (-scan-cmtoutmark- c-mark is-open)))
-      (case (first cnt-result)
-        (0 nil)
-        (1 (append uc-range (list (second cnt-result))))
-        (t (narrow-to-region (first scan-range) (second scan-range))
-           (-scan-outermost-cmtoutmark- stmks scan-range)))))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ğ’T‚·
-  (defun -scan-cmtoutmark- (c-mark is-open)
-    (let ((goto-scan-start-point (if is-open #'goto-eol #'goto-bol))
-          (go-next (if is-open #'backward-char #'forward-char))
-          (stop-p (if is-open #'bolp #'eolp))
-          (cnt 0)
-          (pnt))
-      (funcall goto-scan-start-point)
-      (loop
-        (when (looking-for c-mark)
-          (setq cnt (1+ cnt))
-          (setq pnt (point)))
-        (unless (funcall go-next) (return)))
-      (list cnt pnt)))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ÌˆÊ’u‚ªs––‚©‚ğ”»’è‚·‚éis––‚È‚çtA‚³‚à‚È‚­‚Înil‚ğ•Ô‚·j
-  (defun -is-line-end- (c-mark pnt)
-    (goto-char pnt)
-    (looking-at (format nil "~A$" c-mark)))
-
-
-  ; ƒRƒƒ“ƒgƒAƒEƒg•¶š—ñ‚ğíœ‚·‚é
-  (defun -delete-cmtoutmark- (stmks uncmt-info)
-    (let* ((uncmt-pnt (third uncmt-info))
-           (c-mark (regexp-quote (first stmks)))
-           (l-spc (if (-is-indent-tail- uncmt-pnt)
-                      nil (third stmks)))
-           (r-spc (if (-is-line-end- c-mark uncmt-pnt)
-                      nil (second stmks)))
-           (is-open (fourth stmks))
-           (cmt-regexp
-            (concat l-spc (format nil "\\(~A\\)" c-mark) r-spc)))
-      (save-restriction
-        (narrow-to-region (first uncmt-info) (second uncmt-info))
-        (dolist (dels (list (list cmt-regexp "\\1") (list c-mark "")))
-          (goto-bol)
-          (replace-buffer (first dels) (second dels) :regexp t)))
-        ))
-
-
-  ; ƒAƒ“ƒRƒƒ“ƒgiƒRƒƒ“ƒgƒAƒEƒg‚©‚ç•œ‹Aj‚·‚é
-  (defun uncomment-region ()
-    (interactive)
-    (let* ((start (min (mark) (point)))
-           (end (max (mark) (point)))
-           (cmt-letters (-get-cmt-letters-))
-           (spc-regexps (-get-spaces- t))
-           (is-open (list t nil))
-           (uncmt-info)
-           (line-range)
-           (set-of-marks (mapcar #'list
-                                 cmt-letters
-                                 spc-regexps
-                                 (reverse spc-regexps)
-                                 is-open)))
-
-      (save-excursion
-        (-get-region-info- start end)
-        (save-restriction
-          ; ƒŠ[ƒWƒ‡ƒ““à‚É•ÒW”ÍˆÍ‚ğŒÀ’è
-          (if (and start-is-not-bol (not start-is-midpoint-of-indent))
-              (progn
-                (goto-char start)
-                (goto-bol)
-                (narrow-to-region (point) end))
-            (narrow-to-region start end))
-          (goto-char (point-min))
-
-          (loop
-            (save-restriction
-              ; •ÒW”ÍˆÍ§ŒÀ‚ğˆês–ˆ‚É
-              (setq line-range (list (progn (goto-bol) (point))
-                                     (progn (goto-eol) (point))))
-              (narrow-to-region (first line-range) (second line-range))
-              (dolist (stmk set-of-marks)
-                (when (first stmk)
-                  (save-restriction
-                    (setq uncmt-info
-                          (-scan-outermost-cmtoutmark- stmk line-range))
-                    (when uncmt-info
-                      (-delete-cmtoutmark- stmk uncmt-info))))))
-            (unless (next-line) (return))))
-        )))
-  )
+ï»¿; cmt-region.l;; Copyright (c) 2014 Kentarou Hirano (a.k.a Kengpong);; This software is released under the MIT License.;; http://opensource.org/licenses/mit-license.php; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³ã‚’ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆï¼ã‚¢ãƒ³ã‚³ãƒ¡ãƒ³ãƒˆã™ã‚‹; ä½¿ç”¨æ–¹æ³•ã¯READMEã‚’å‚ç…§ã®ã“ã¨; ã‚³ãƒ¡ãƒ³ãƒˆãƒãƒ¼ã‚¯ã®å†…å´/å¤–å´ã«ã‚¹ãƒšãƒ¼ã‚¹ã‚’å…¥ã‚Œã‚‹ãªã‚‰tã€å…¥ã‚Œãªã„ãªã‚‰nilã‚’è¨­å®šã™ã‚‹(defvar *-let-inside-space-* t)(defvar *-let-outside-space-* t); ã‚³ãƒ¡ãƒ³ãƒˆãƒãƒ¼ã‚¯ã®å†…å´/å¤–å´ã«å…¥ã‚Œã‚‹ã‚¹ãƒšãƒ¼ã‚¹ã®æ•°(defvar *-inside-space-width-* 1)(defvar *-outside-space-width-* 2); å„è¨€èªãƒ¢ãƒ¼ãƒ‰ã«åˆã‚ã›ãŸã‚³ãƒ¡ãƒ³ãƒˆãƒãƒ¼ã‚¯ï¼ˆæ–‡å­—åˆ—ï¼‰ã®ãƒ†ãƒ¼ãƒ–ãƒ«(defvar *-commentize-mode-table-* (make-hash-table :test #'equalp))(setf (gethash 'lisp-interaction-mode *-commentize-mode-table-*) '(";" nil))(setf (gethash 'lisp-mode *-commentize-mode-table-*) '(";" nil))(setf (gethash 'c-mode *-commentize-mode-table-*) '("/*" "*/"))(setf (gethash 'css-mode *-commentize-mode-table-*) '("/*" "*/"))(setf (gethash 'py-mode *-commentize-mode-table-*) '("#" nil))(setf (gethash 'python-mode *-commentize-mode-table-*) '("#" nil))(setf (gethash 'bash-mode *-commentize-mode-table-*) '("#" nil))(setf (gethash 'c++-mode *-commentize-mode-table-*) '("//" nil))(setf (gethash 'java-mode *-commentize-mode-table-*) '("//" nil))(setf (gethash 'javascript-mode *-commentize-mode-table-*) '("//" nil))(setf (gethash 'basic-mode *-commentize-mode-table-*) '("'" nil))(setf (gethash 'sql-mode *-commentize-mode-table-*) '("--" nil))(setf (gethash 'html-mode *-commentize-mode-table-*) '("<!--" "-->"))(setf (gethash 'pascal-mode *-commentize-mode-table-*) '("{" "}"))(let ((start-is-not-bol)      (start-is-tail-of-indent)      (start-is-midpoint-of-indent)      (end-is-not-eol)      (cmtoutpoint)      (top-line-number)      (last-line-number))  ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³å†…ã®çŠ¶æ³ã‚’æŠŠæ¡ã™ã‚‹  (defun -get-region-info- (start end)    ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³å…ˆé ­    (goto-char start)    (setq start-is-not-bol (not (bolp)))    (setq start-is-tail-of-indent (-is-indent-tail- start))    (setq start-is-midpoint-of-indent (-is-midpoint-of-indent- start))    ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³æœ«å°¾    (goto-char end)    (setq end-is-not-eol (not (eolp))))  ; ç¾åœ¨è¡Œã®ã‚¤ãƒ³ãƒ‡ãƒ³ãƒˆã®æ·±ã•ã‚’æ±‚ã‚ã‚‹ã€‚ç©ºè¡Œã‚‚ã—ãã¯ç©ºç™½æ–‡å­—ã ã‘ã®è¡Œãªã‚‰nilã‚’è¿”ã™ã€‚  (defun -get-indent-width- ()    ; ç¾åœ¨è¡ŒãŒç©ºè¡Œãªã‚‰tã‚’è¿”ã™    (defun -is-all-blank- ()      (cond ((eolp) t)          ((looking-at "[^ \t]") nil)          (t (forward-char) (-is-all-blank-))))      (goto-bol)      (unless (-is-all-blank-) (current-column)))  ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³ã®æœ€çµ‚è¡Œãªã‚‰tã€ãã†ã§ãªã‘ã‚Œã°nilã‚’è¿”ã™  (defun -is-lastline- ()    (equal (current-line-number) last-line-number))  ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³ã®é–‹å§‹è¡Œãªã‚‰tã€ãã†ã§ãªã‘ã‚Œã°nilã‚’è¿”ã™  (defun -is-topline- ()    (equal (current-line-number) top-line-number))  ; pntãŒã‚¤ãƒ³ãƒ‡ãƒ³ãƒˆã®æœ«å°¾ï¼ˆè¡Œé ­ã‹ã‚‰é€£ãªã‚‹ç©ºç™½ã¨æ–‡å­—ã®å¢ƒç•Œã€ã‚‚ã—ãã¯è¡Œé ­ã«ç©ºç™½  ; ãŒç„¡ã„ï¼‰ã‹ã‚’åˆ¤æ–­ã™ã‚‹ã€‚ã‚¤ãƒ³ãƒ‡ãƒ³ãƒˆã®æœ«å°¾ãªã‚‰tã€ãã†ã§ãªã‘ã‚Œã°nilã‚’è¿”ã™  (defun -is-indent-tail- (pnt)    (save-excursion      (goto-bol)      (when (string-match "^[ \t]*$" (buffer-substring (point) pnt))        t)))  ; pntãŒã‚¤ãƒ³ãƒ‡ãƒ³ãƒˆã®ä¸­ã§ã‚ã‚Œã°tã€ãã†ã§ãªã‘ã‚Œã°nilã‚’è¿”ã™  ; pntä½ç½®ã®è¡ŒãŒç©ºè¡Œã§ã‚ã‚Œã°nilã‚’è¿”ã™  (defun -is-midpoint-of-indent- (pnt)    (save-excursion      (goto-char pnt)      (loop        (unless (looking-at "[ \t]+[^ \t]")          (return nil))        (backward-char)        (when (bolp) (return t)))))  ; ãƒ¢ãƒ¼ãƒ‰ã«åˆã£ãŸã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã®å–å¾—  (defun -get-cmt-letters- ()    (let ((cmt-letters (gethash buffer-mode *-commentize-mode-table-*)))      ; commentize-mode-tableã«ç„¡ã„ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆã¯      ; ãƒ—ãƒ­ãƒ³ãƒ—ãƒˆã§ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—ã‚’å…¥åŠ›ã•ã›ã‚‹      ; default: nil      (unless cmt-letters        (let ((prompt1 "Letter(s) for comment start: ")              (prompt2 "Letter(s) for comment end (default: nil): "))          (setq cmt-letters                (nconc (list (read-string prompt1))                       (list (read-string prompt2))))))      cmt-letters))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã®å†…å´/å¤–å´ã®ã‚¹ãƒšãƒ¼ã‚¹æ–‡å­—åˆ—/æ­£è¦è¡¨ç¾ã‚’æº–å‚™ã™ã‚‹  (defun -get-spaces- (&optional (regexp nil))    (let ((spclist nil))      (dolist (spc-conds               (list (list *-let-inside-space-* *-inside-space-width-*)                     (list *-let-outside-space-* *-outside-space-width-*))               spclist)        (setq spclist              (append spclist                      (if (first spc-conds)                          (list                           (if regexp                              (format nil "[ ]\\{~A\\}" (second spc-conds))                             (make-sequence 'string (second spc-conds)                                            :initial-element '#\ )))                        (list "")))))))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã‚’ç½®ãä½ç½®ã‚’æ±ºã‚ã‚‹  (defun -get-cmtoutpoint- ()    (let ((indent-width)          (indent-width-list))        (goto-char (point-min))        (setq top-line-number (current-line-number))        (loop          (setq indent-width-list                (if (setq indent-width (-get-indent-width-))                    (cons indent-width indent-width-list)                  indent-width-list))          (unless (forward-line) (return)))        (setq last-line-number (current-line-number))        (setq cmtoutpoint (reduce #'min indent-width-list))))  ; å„è¡Œã«ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã‚’ç½®ã  (defun -put-cmtoutletters- (cmt-letters spaces)    ; ã‚³ãƒ¡ãƒ³ãƒˆå…ˆé ­ã®å‡¦ç†    (when (first cmt-letters)      (if (and (-is-topline-)               start-is-not-bol)            (loop              (if (looking-at "[^ \t]")                  (return)                (forward-char)));)        (goto-column cmtoutpoint))      (unless (or (eolp) (looking-at "[ \t]*$"))        (insert         (concat          (when (and start-is-not-bol                     (-is-topline-)                     (not start-is-tail-of-indent))            (second spaces))          (first cmt-letters) (first spaces)))))    ; ã‚³ãƒ¡ãƒ³ãƒˆæœ«å°¾ã®å‡¦ç†    (when (second cmt-letters)      (goto-eol)      (when (and (-is-lastline-) end-is-not-eol)        (backward-char)        (loop          (if (looking-at "[^ \t]")              (progn                (forward-char)                (return))            (backward-char))))      (unless (or (bolp) (looking-at "^[ \t]*$"))        (insert         (concat (first spaces)                 (second cmt-letters)                 (when (and end-is-not-eol (-is-lastline-))                   (second spaces))))))    (when (forward-line) (-put-cmtoutletters- cmt-letters spaces)))  ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³å†…ã‚’ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆã™ã‚‹  (defun commentout-region ()    (interactive)    (let ((start (min (mark) (point)))          (end (max (mark) (point)))          (cmt-letters (-get-cmt-letters-))          (spaces (-get-spaces-)))      (save-excursion        (-get-region-info- start end)        (save-restriction          ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³å†…ã«ç·¨é›†ç¯„å›²ã‚’é™å®š          (if (and start-is-not-bol start-is-midpoint-of-indent)              (progn                (goto-char start)                (goto-bol)                (narrow-to-region (point) end))            (narrow-to-region start end))          (-get-cmtoutpoint-)          (goto-char (point-min))          (-put-cmtoutletters- cmt-letters spaces)))))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ãŒå­˜åœ¨ã™ã‚‹ã‹ã‚’åˆ¤å®šã™ã‚‹  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ãŒã‚ã‚Œã°ç¯„å›²ã‚’ç¤ºã—ãŸãƒã‚¤ãƒ³ãƒˆäºŒã¤ãŒå…¥ã£ãŸãƒªã‚¹ãƒˆã‚’è¿”ã™ã€‚  ; ç„¡ã‘ã‚Œã°nil  (defun -get-scan-range- (c-mark is-open)    (if is-open (goto-eol) (goto-bol))    (when (scan-buffer c-mark :reverse is-open :tail (not is-open))      (list (point) (if is-open (progn (goto-bol) (point))                      (progn (goto-eol) (point))))))  ; æœ€ã‚‚å·¦å´ï¼ˆå›²ã‚€ã‚¹ã‚¿ã‚¤ãƒ«ã®ã‚³ãƒ¡ãƒ³ãƒˆã¯æœ€ã‚‚å¤–å´ï¼‰ã®ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã‚’ç‰¹å®šã™ã‚‹  (defun -scan-outermost-cmtoutmark- (stmks uc-range)    (let* ((c-mark (first stmks))           (is-open (fourth stmks))           (scan-range (-get-scan-range- c-mark is-open))           (cnt-result (-scan-cmtoutmark- c-mark is-open)))      (case (first cnt-result)        (0 nil)        (1 (append uc-range (list (second cnt-result))))        (t (narrow-to-region (first scan-range) (second scan-range))           (-scan-outermost-cmtoutmark- stmks scan-range)))))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã‚’æ¢ã™  (defun -scan-cmtoutmark- (c-mark is-open)    (let ((goto-scan-start-point (if is-open #'goto-eol #'goto-bol))          (go-next (if is-open #'backward-char #'forward-char))          (stop-p (if is-open #'bolp #'eolp))          (cnt 0)          (pnt))      (funcall goto-scan-start-point)      (loop        (when (looking-for c-mark)          (setq cnt (1+ cnt))          (setq pnt (point)))        (unless (funcall go-next) (return)))      (list cnt pnt)))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã®ä½ç½®ãŒè¡Œæœ«ã‹ã‚’åˆ¤å®šã™ã‚‹ï¼ˆè¡Œæœ«ãªã‚‰tã€ã•ã‚‚ãªãã°nilã‚’è¿”ã™ï¼‰  (defun -is-line-end- (c-mark pnt)    (goto-char pnt)    (looking-at (format nil "~A$" c-mark)))  ; ã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆæ–‡å­—åˆ—ã‚’å‰Šé™¤ã™ã‚‹  (defun -delete-cmtoutmark- (stmks uncmt-info)    (let* ((uncmt-pnt (third uncmt-info))           (c-mark (regexp-quote (first stmks)))           (l-spc (if (-is-indent-tail- uncmt-pnt)                      nil (third stmks)))           (r-spc (if (-is-line-end- c-mark uncmt-pnt)                      nil (second stmks)))           (is-open (fourth stmks))           (cmt-regexp            (concat l-spc (format nil "\\(~A\\)" c-mark) r-spc)))      (save-restriction        (narrow-to-region (first uncmt-info) (second uncmt-info))        (dolist (dels (list (list cmt-regexp "\\1") (list c-mark "")))          (goto-bol)          (replace-buffer (first dels) (second dels) :regexp t)))        ))  ; ã‚¢ãƒ³ã‚³ãƒ¡ãƒ³ãƒˆï¼ˆã‚³ãƒ¡ãƒ³ãƒˆã‚¢ã‚¦ãƒˆã‹ã‚‰å¾©å¸°ï¼‰ã™ã‚‹  (defun uncomment-region ()    (interactive)    (let* ((start (min (mark) (point)))           (end (max (mark) (point)))           (cmt-letters (-get-cmt-letters-))           (spc-regexps (-get-spaces- t))           (is-open (list t nil))           (uncmt-info)           (line-range)           (set-of-marks (mapcar #'list                                 cmt-letters                                 spc-regexps                                 (reverse spc-regexps)                                 is-open)))      (save-excursion        (-get-region-info- start end)        (save-restriction          ; ãƒªãƒ¼ã‚¸ãƒ§ãƒ³å†…ã«ç·¨é›†ç¯„å›²ã‚’é™å®š          (if (and start-is-not-bol (not start-is-midpoint-of-indent))              (progn                (goto-char start)                (goto-bol)                (narrow-to-region (point) end))            (narrow-to-region start end))          (goto-char (point-min))          (loop            (save-restriction              ; ç·¨é›†ç¯„å›²åˆ¶é™ã‚’ä¸€è¡Œæ¯ã«              (setq line-range (list (progn (goto-bol) (point))                                     (progn (goto-eol) (point))))              (narrow-to-region (first line-range) (second line-range))              (dolist (stmk set-of-marks)                (when (first stmk)                  (save-restriction                    (setq uncmt-info                          (-scan-outermost-cmtoutmark- stmk line-range))                    (when uncmt-info                      (-delete-cmtoutmark- stmk uncmt-info))))))            (unless (next-line) (return))))        )))  )

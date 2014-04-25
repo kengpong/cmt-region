@@ -77,30 +77,27 @@ xyzzyの設定ファイル（.xyzzy もしくは siteinit.l）に設定を書く
     ```lisp
     (setq *-let-inside-space-* t)
     ```  
-
-
+  
 * コメント文字とコメント外文字列の間に空白文字を入れるか否か  
     `t`（空白文字を入れる）か`nil`（入れない）を選択してください。（デフォルト: t）
     ```lisp
     (setq *-let-outside-space-* t)
     ```  
-
-
+  
 * コメント文字とコメントする文字列の間に入れる空白文字の数  
     空白文字数を数値で指定してください。（デフォルト: 1）
     ```lisp
     (setq *-inside-space-width-* 1)
     ```  
-
-
+  
 * コメント文字とコメント外文字列の間に入れる空白文字の数  
     空白文字数を数値で指定してください。（デフォルト: 2）
     ```lisp
     (setq *-outside-space-width-* 2)
     ```  
+  
 
-
-※ \*-inside-space-width-\*と\*-outside-space-width-\*を0にした場合、\*-let-inside-space-\*と\*-let-inside-space-\*をそれぞれnilにしたのと（結果的に）同じ挙動となります。
+※ \*-inside-space-width-\*を0にした場合、\*-let-inside-space-\*をnilにしたのと（結果的に）同じ挙動となります。\*-outside-space-width-\*を0にした場合と\*-let-inside-space-\*をnilにした場合も同様です。
 
 * * *
 
